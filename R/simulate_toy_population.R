@@ -63,7 +63,7 @@ provisional_genetic_parameters <- AlphaSimR:::calcGenParam(trait, founders, 1)
 
 resulting_additive_genetic_variance <- popVar(provisional_genetic_parameters$bv)[1]
 
-trait@intercept <- desired_mean - mean(provisional_genetic_parameters$gv)
+trait@intercept <- - mean(provisional_genetic_parameters$gv)
 
 simparam$manAddTrait(lociMap = trait, varE = resulting_additive_genetic_variance/3)
 

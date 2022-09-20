@@ -3,6 +3,7 @@
 
 library(dplyr)
 library(hglm)
+library(ggplot2)
 library(readr)
 library(patchwork)
 
@@ -97,3 +98,57 @@ plot_true_estimated <- plot_true_estimated_posA / plot_true_estimated_posAD
 filter(gwasA_pos, p < 1e-8)
 
 filter(gwasAD_pos, p < 1e-8)
+
+
+
+
+## Test with missing data
+
+missing_by_col <- replicate(ncol(geno),
+                            sample(1:nrow(geno), nrow(geno) * 0.01),
+                            simplify = FALSE)
+
+geno_missing <- geno
+
+for (ix in 1:ncol(geno)) {
+  geno_missing[missing_by_col[[ix]], ix] <- NA
+}
+
+
+geno_missing_pruned <- remove_monomorphic(geno_missing)
+
+gwasA_missing <- run_gwasA(pheno = pheno$X1,
+                           X = X,
+                           Z = Z_grm,
+                           RandC = RandC,
+                           geno_missing_pruned)
+
+
+gwasAD_missing <- run_gwasAD(pheno = pheno$X1,
+                             X = X,
+                             Z = Z_grm,
+                             RandC = RandC,
+                             geno_missing_pruned)
+
+
+
+gwasA_missing_pos <- inner_join(gwasA_missing, marker_pos)
+
+gwasAD_missing_pos <- inner_join(gwasAD_missing, marker_pos)
+
+plot_true_estimated_posA_missing <- qplot(x = pos, y = -log10(p), data = gwasA_missing_pos) +
+  facet_wrap(~chr) +
+  geom_point(aes(x = pos, y = 15), colour = "red", data = qtl_pos, shape = 2)
+
+
+plot_true_estimated_posAD_missing <- qplot(x = pos, y = -log10(p), data = gwasAD_missing_pos) +
+  facet_wrap(~chr) +
+  geom_point(aes(x = pos, y = 15), colour = "red", data = qtl_pos, shape = 2)
+
+
+plot_true_estimated_missing <- plot_true_estimated_posA_missing / plot_true_estimated_posAD_missing
+
+
+filter(gwasA_missing_pos, p < 1e-8)
+
+filter(gwasAD_missing_pos, p < 1e-8)

@@ -12,6 +12,17 @@ prune_snp_matrix <- function(snp_matrix) {
 }
 
 
+## Only remove monomorphic -- for data with missing genotypes
+
+remove_monomorphic <- function(snp_matrix) {
+
+  genotype_values <- lapply(snp_matrix, function(x) length(unique(na.exclude(x))))
+  
+  snp_matrix[, genotype_values > 1]
+  
+}
+
+
 
 ## Decompose the gnomic relationship matrix to find the modified incidence
 ## matrix
@@ -116,18 +127,22 @@ run_gwasAD <- function(pheno,
   
   for (snp_ix in 1:n_snp) {
     
-    transformed_snp <- transformation_matrix %*% as.matrix(snp_matrix[, snp_ix] - 1)
-    transformed_d <- transformation_matrix %*% as.matrix(as.numeric(snp_matrix[, snp_ix] == 1))
+    missing_genotype <- is.na(snp_matrix[, snp_ix])
     
-    X1 <- cbind(transformed_snp, transformed_d, transformed_X)
+    transformed_snp <- transformation_matrix[!missing_genotype, !missing_genotype] %*%
+      as.matrix(snp_matrix[!missing_genotype, snp_ix] - 1)
+    transformed_d <- transformation_matrix[!missing_genotype, !missing_genotype] %*%
+      as.matrix(as.numeric(snp_matrix[!missing_genotype, snp_ix] == 1))
+    
+    X1 <- cbind(transformed_snp, transformed_d, transformed_X[!missing_genotype,])
     qr1 <- qr(X1)
-    est1 <- qr.coef(qr1, transformed_y)
-    residual1 <- transformed_y - X1 %*% est1
-    RSS1 <- sum(residual1^2)/n_ind
+    est1 <- qr.coef(qr1, transformed_y[!missing_genotype])
+    residual1 <- transformed_y[!missing_genotype] - X1 %*% est1
+    RSS1 <- sum(residual1^2)/(n_ind - sum(missing_genotype))
     
     estimate_a[snp_ix] <- est1[1]
     estimate_d[snp_ix] <- est1[2]
-    LRT[snp_ix] <- -n_ind * (log(RSS1) - log(RSS_null))
+    LRT[snp_ix] <- -(n_ind - sum(missing_genotype)) * (log(RSS1) - log(RSS_null))
     p[snp_ix] <- 1 - pchisq(LRT[snp_ix],
                             df = 1)
   }
@@ -192,16 +207,19 @@ run_gwasA <- function(pheno,
   
   for (snp_ix in 1:n_snp) {
     
-    transformed_snp <- transformation_matrix %*% as.matrix(snp_matrix[, snp_ix] - 1)
+    missing_genotype <- is.na(snp_matrix[, snp_ix])
     
-    X1 <- cbind(transformed_snp, transformed_X)
+    transformed_snp <- transformation_matrix[!missing_genotype,!missing_genotype] %*%
+      as.matrix(snp_matrix[!missing_genotype, snp_ix] - 1)
+    
+    X1 <- cbind(transformed_snp, transformed_X[!missing_genotype,])
     qr1 <- qr(X1)
-    est1 <- qr.coef(qr1, transformed_y)
-    residual1 <- transformed_y - X1 %*% est1
-    RSS1 <- sum(residual1^2)/n_ind
+    est1 <- qr.coef(qr1, transformed_y[!missing_genotype])
+    residual1 <- transformed_y[!missing_genotype] - X1 %*% est1
+    RSS1 <- sum(residual1^2)/(n_ind - sum(missing_genotype))
     
     estimate[snp_ix] <- est1[1]
-    LRT[snp_ix] <- -n_ind * (log(RSS1) - log(RSS_null))
+    LRT[snp_ix] <- -(n_ind - sum(missing_genotype)) * (log(RSS1) - log(RSS_null))
     p[snp_ix] <- 1 - pchisq(LRT[snp_ix],
                             df = 1)
   }

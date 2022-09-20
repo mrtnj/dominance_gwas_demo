@@ -127,24 +127,22 @@ run_gwasAD <- function(pheno,
   
   for (snp_ix in 1:n_snp) {
     
-    missing_genotype <- is.na(snp_matrix[, snp_ix])
+    transformed_snp <- transformation_matrix %*%
+      as.matrix(snp_matrix[, snp_ix] - 1)
+    transformed_d <- transformation_matrix %*%
+      as.matrix(as.numeric(snp_matrix[, snp_ix] == 1))
     
-    transformed_snp <- transformation_matrix[!missing_genotype, !missing_genotype] %*%
-      as.matrix(snp_matrix[!missing_genotype, snp_ix] - 1)
-    transformed_d <- transformation_matrix[!missing_genotype, !missing_genotype] %*%
-      as.matrix(as.numeric(snp_matrix[!missing_genotype, snp_ix] == 1))
-    
-    X1 <- cbind(transformed_snp, transformed_d, transformed_X[!missing_genotype,])
+    X1 <- cbind(transformed_snp, transformed_d, transformed_X)
     qr1 <- qr(X1)
-    est1 <- qr.coef(qr1, transformed_y[!missing_genotype])
-    residual1 <- transformed_y[!missing_genotype] - X1 %*% est1
-    RSS1 <- sum(residual1^2)/(n_ind - sum(missing_genotype))
+    est1 <- qr.coef(qr1, transformed_y)
+    residual1 <- transformed_y - X1 %*% est1
+    RSS1 <- sum(residual1^2)/n_ind
     
     estimate_a[snp_ix] <- est1[1]
     estimate_d[snp_ix] <- est1[2]
-    LRT[snp_ix] <- -(n_ind - sum(missing_genotype)) * (log(RSS1) - log(RSS_null))
+    LRT[snp_ix] <- -n_ind * (log(RSS1) - log(RSS_null))
     p[snp_ix] <- 1 - pchisq(LRT[snp_ix],
-                            df = 1)
+                            df = 2)
   }
   
   data.frame(marker_id = colnames(snp_matrix),
@@ -207,7 +205,86 @@ run_gwasA <- function(pheno,
   
   for (snp_ix in 1:n_snp) {
     
+    transformed_snp <- transformation_matrix %*%
+      as.matrix(snp_matrix[, snp_ix] - 1)
+    
+    X1 <- cbind(transformed_snp, transformed_X)
+    qr1 <- qr(X1)
+    est1 <- qr.coef(qr1, transformed_y)
+    residual1 <- transformed_y - X1 %*% est1
+    RSS1 <- sum(residual1^2)/n_ind
+    
+    estimate[snp_ix] <- est1[1]
+    LRT[snp_ix] <- -n_ind * (log(RSS1) - log(RSS_null))
+    p[snp_ix] <- 1 - pchisq(LRT[snp_ix],
+                            df = 1)
+  }
+  
+  data.frame(marker_id = colnames(snp_matrix),
+             estimate,
+             LRT,
+             p)
+}
+
+
+
+## Fit the null model in each iteration allowing for different numbers of
+## SNPs
+
+
+run_gwasA_missing <- function(pheno,
+                              X,
+                              Z,
+                              RandC,
+                              snp_matrix) {
+  
+  n_ind <- length(pheno)
+  n_snp <- ncol(snp_matrix)
+  
+  ## Fit baseline model
+  
+  model_baseline <- hglm(y = pheno,
+                         X = X,
+                         Z = Z,
+                         RandC = RandC)
+  
+  
+  ratio <- model_baseline$varRanef/model_baseline$varFix
+  
+  V <- make_V_matrix(Z,
+                     RandC,
+                     ratio)
+  
+  eigV <- eigen(V)
+  
+  transformation_matrix <- diag(1/sqrt(eigV$values)) %*% t(eigV$vectors)
+  
+  transformed_y <- transformation_matrix %*% pheno
+  transformed_X <- transformation_matrix %*% X
+
+  
+  estimate <- numeric(n_snp)
+  LRT <- numeric(n_snp)
+  p <- numeric(n_snp)
+  
+  for (snp_ix in 1:n_snp) {
+    
     missing_genotype <- is.na(snp_matrix[, snp_ix])
+    
+    
+    ## Null model
+    
+    qr0 <- qr(transformed_X[!missing_genotype,])
+    
+    est0 <- qr.coef(qr0, transformed_y[!missing_genotype])
+    
+    null_residual <- transformed_y[!missing_genotype] -
+      transformed_X[!missing_genotype,] %*% est0
+    
+    RSS_null <- sum(null_residual^2)/(n_ind - sum(missing_genotype))
+    
+    
+    ## SNP model
     
     transformed_snp <- transformation_matrix[!missing_genotype,!missing_genotype] %*%
       as.matrix(snp_matrix[!missing_genotype, snp_ix] - 1)
@@ -229,6 +306,90 @@ run_gwasA <- function(pheno,
              LRT,
              p)
 }
+
+
+run_gwasAD_missing <- function(pheno,
+                               X,
+                               Z,
+                               RandC,
+                               snp_matrix) {
+  
+  n_ind <- length(pheno)
+  n_snp <- ncol(snp_matrix)
+  
+  ## Fit baseline model
+  
+  model_baseline <- hglm(y = pheno,
+                         X = X,
+                         Z = Z,
+                         RandC = RandC)
+  
+  
+  ratio <- model_baseline$varRanef/model_baseline$varFix
+  
+  V <- make_V_matrix(Z,
+                     RandC,
+                     ratio)
+  
+  eigV <- eigen(V)
+  
+  transformation_matrix <- diag(1/sqrt(eigV$values)) %*% t(eigV$vectors)
+  
+  transformed_y <- transformation_matrix %*% pheno
+  transformed_X <- transformation_matrix %*% X
+
+  
+  
+  estimate_a <- numeric(n_snp)
+  estimate_d <- numeric(n_snp)
+  LRT <- numeric(n_snp)
+  p <- numeric(n_snp)
+  
+  for (snp_ix in 1:n_snp) {
+    
+    missing_genotype <- is.na(snp_matrix[, snp_ix])
+    
+    ## Null model
+    
+    qr0 <- qr(transformed_X[!missing_genotype,])
+    
+    est0 <- qr.coef(qr0, transformed_y[!missing_genotype])
+    
+    null_residual <- transformed_y[!missing_genotype] -
+      transformed_X[!missing_genotype,] %*% est0
+    
+    RSS_null <- sum(null_residual^2)/(n_ind - sum(missing_genotype))
+    
+    
+    ## SNP model
+    
+    transformed_snp <- transformation_matrix[!missing_genotype, !missing_genotype] %*%
+      as.matrix(snp_matrix[!missing_genotype, snp_ix] - 1)
+    transformed_d <- transformation_matrix[!missing_genotype, !missing_genotype] %*%
+      as.matrix(as.numeric(snp_matrix[!missing_genotype, snp_ix] == 1))
+    
+    X1 <- cbind(transformed_snp, transformed_d, transformed_X[!missing_genotype,])
+    qr1 <- qr(X1)
+    est1 <- qr.coef(qr1, transformed_y[!missing_genotype])
+    residual1 <- transformed_y[!missing_genotype] - X1 %*% est1
+    RSS1 <- sum(residual1^2)/(n_ind - sum(missing_genotype))
+    
+    estimate_a[snp_ix] <- est1[1]
+    estimate_d[snp_ix] <- est1[2]
+    LRT[snp_ix] <- -(n_ind - sum(missing_genotype)) * (log(RSS1) - log(RSS_null))
+    p[snp_ix] <- 1 - pchisq(LRT[snp_ix],
+                            df = 2)
+  }
+  
+  data.frame(marker_id = colnames(snp_matrix),
+             estimate_a,
+             estimate_d,
+             LRT,
+             p)
+}
+
+
+
 
 
 ## Get heritability estimate from a hgml model

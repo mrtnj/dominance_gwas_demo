@@ -100,7 +100,7 @@ filter(gwasA_pos, p < 1e-8)
 filter(gwasAD_pos, p < 1e-8)
 
 
-
+stop()
 
 ## Test with missing data
 
@@ -117,18 +117,18 @@ for (ix in 1:ncol(geno)) {
 
 geno_missing_pruned <- remove_monomorphic(geno_missing)
 
-gwasA_missing <- run_gwasA(pheno = pheno$X1,
-                           X = X,
-                           Z = Z_grm,
-                           RandC = RandC,
-                           geno_missing_pruned)
+gwasA_missing <- run_gwasA_missing(pheno = pheno$X1,
+                                   X = X,
+                                   Z = Z_grm,
+                                   RandC = RandC,
+                                   geno_missing_pruned)
 
 
-gwasAD_missing <- run_gwasAD(pheno = pheno$X1,
-                             X = X,
-                             Z = Z_grm,
-                             RandC = RandC,
-                             geno_missing_pruned)
+gwasAD_missing <- run_gwasAD_missing(pheno = pheno$X1,
+                                     X = X,
+                                     Z = Z_grm,
+                                     RandC = RandC,
+                                     geno_missing_pruned)
 
 
 

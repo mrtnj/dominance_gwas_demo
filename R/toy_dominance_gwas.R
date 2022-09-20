@@ -100,9 +100,11 @@ filter(gwasA_pos, p < 1e-8)
 filter(gwasAD_pos, p < 1e-8)
 
 
-stop()
+
 
 ## Test with missing data
+
+set.seed(20220920)
 
 missing_by_col <- replicate(ncol(geno),
                             sample(1:nrow(geno), nrow(geno) * 0.01),

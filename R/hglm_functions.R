@@ -279,7 +279,7 @@ run_gwasA_missing <- function(pheno,
     est0 <- qr.coef(qr0, transformed_y[!missing_genotype])
     
     null_residual <- transformed_y[!missing_genotype] -
-      transformed_X[!missing_genotype,] %*% est0
+      transformed_X[!missing_genotype] * est0
     
     RSS_null <- sum(null_residual^2)/(n_ind - sum(missing_genotype))
     
@@ -356,7 +356,7 @@ run_gwasAD_missing <- function(pheno,
     est0 <- qr.coef(qr0, transformed_y[!missing_genotype])
     
     null_residual <- transformed_y[!missing_genotype] -
-      transformed_X[!missing_genotype,] %*% est0
+      transformed_X[!missing_genotype] * est0
     
     RSS_null <- sum(null_residual^2)/(n_ind - sum(missing_genotype))
     
